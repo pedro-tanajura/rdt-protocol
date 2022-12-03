@@ -7,26 +7,17 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <pthread.h>
-#include <stdbool.h>
 
 #define FILA 1000
 #define MAX_REQ 1000
-
-struct pacote{
-    int id;
-    bool ack;
-    char msg[MAX_REQ];
-};
 
 struct tparam_t {
 	int cfd, nr;
 	pthread_t tid;
 	struct sockaddr_in caddr;
 	socklen_t addr_len;
-	struct pacote req;
+	char req[MAX_REQ];
 };
-
-
 
 void *trata_cliente(void *args){
 	struct tparam_t t = *(struct tparam_t*)args;
@@ -34,10 +25,10 @@ void *trata_cliente(void *args){
 		inet_ntoa(t.caddr.sin_addr),
 		ntohs(t.caddr.sin_port),
 		t.nr,
-		t.req.msg);
+		t.req);
 	fflush(stdout);
 	// processa
-	sendto(t.cfd, t.req.msg, t.nr, 0, (struct sockaddr*)&t.caddr, sizeof(struct sockaddr_in));
+	sendto(t.cfd, t.req, t.nr, 0, (struct sockaddr*)&t.caddr, sizeof(struct sockaddr_in));
 	pthread_exit(NULL);
 }
 
@@ -75,7 +66,7 @@ int main(int argc, char **argv) {
 			return -1;
 		}
 		t[i].cfd = ls;
-		t[i].nr = recvfrom(t[i].cfd, t[i].req.msg, MAX_REQ, 0,
+		t[i].nr = recvfrom(t[i].cfd, t[i].req, MAX_REQ, 0,
 					(struct sockaddr *)&t[i].caddr, &t[i].addr_len);
 		pthread_create(&t[i].tid, NULL, trata_cliente, (void *)&t[i]);
 		i = (i+1)%FILA;
