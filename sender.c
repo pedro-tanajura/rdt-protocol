@@ -10,8 +10,40 @@
     
 #define PORT    5000 
 #define MAXLINE 1000
-    
-// Driver code 
+
+/* Header do sndpkt
+    1,2,3,4 bytes: checksum
+    5 byte: state
+    6 byte: ack
+    próximos bytes: mensagem
+*/
+
+//////////////// EM PROGRESSO //////////////////// 
+
+/*
+char get_checksum(char *msg){
+    int checksum, sum=0, i;
+    for(i=0;i<MAXLINE-6;i++){
+        sum+=msg[i];
+    }
+    checksum=~sum;
+    return checksum;
+}
+
+void sender_make_pkt(char *pkt, char *msg, int state){
+    char checksum;
+    checksum = get_checksum(msg);
+
+    strcat(pkt, &checksum);             // Add checksum
+    strcat(pkt, (char) state);          // Add state
+    strcat(pkt, 0);                     // Add ACK
+    strcat(pkt, msg);                   // Add msg
+}
+
+*/ 
+
+/////////////////////////////////////////////////
+
 int main(int argc, char **argv) { 
     int sockfd; 
     char rcvpkt[MAXLINE];  
@@ -19,7 +51,7 @@ int main(int argc, char **argv) {
     struct timeval tout;
     
     // Creating socket file descriptor 
-    if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
+    if ( (sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0 ) { 
         perror("socket creation failed"); 
         exit(EXIT_FAILURE); 
     } 
@@ -46,7 +78,7 @@ int main(int argc, char **argv) {
         // make_pkt(state, data, checksum)
         char *sndpkt;
         sprintf(sndpkt, "%d", state); // Adicionar o valor state e checksum
-
+        
         do{
             // rdt_send()
             sendto(sockfd, (const char *)sndpkt, strlen(sndpkt), 

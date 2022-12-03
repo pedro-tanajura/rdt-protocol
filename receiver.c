@@ -56,7 +56,15 @@ int main(int argc, char **argv) {
 
 
 	struct tparam_t t[FILA];
+	int state[FILA];
+	int oncethru[FILA];
+	for(int i=0; i<FILA; i++){
+		oncethru[i] = 0;
+		state[i] = 0;
+	}
+
 	int i=0;
+
 	while (1) {
 		t[i].addr_len = sizeof(struct sockaddr_in);
 		bzero(&t[i].caddr, t[i].addr_len);
@@ -66,9 +74,24 @@ int main(int argc, char **argv) {
 			return -1;
 		}
 		t[i].cfd = ls;
+
+		// rdt_rcv
 		t[i].nr = recvfrom(t[i].cfd, t[i].req, MAX_REQ, 0,
 					(struct sockaddr *)&t[i].caddr, &t[i].addr_len);
+
+		// if corrupt(t[i].req) || has_wrong_seq(t[i].req, state[i])
+			// if oncethru[i] == 1
+				// send ack (state[i]+1)%2
+		// else 
+			// pthread_create
+			// make ack state[i]
+			// send ack state[i]
+			// state[i] = (state[i]+1)%2
+			// oncethru[i] = 1
 		pthread_create(&t[i].tid, NULL, trata_cliente, (void *)&t[i]);
+		oncethru[i] = 1;
+		state[i] = (state[i]+1)%2;
+
 		i = (i+1)%FILA;
 	}
 	close(ls);
