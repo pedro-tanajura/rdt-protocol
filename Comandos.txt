@@ -1,0 +1,9 @@
+gcc -o sender sender.c -pthread
+
+gcc -o sender sender.c -pthread
+
+./receiver 5000
+
+./sender addr port msg
+
+ifconfig
