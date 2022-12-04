@@ -1,9 +1,43 @@
 gcc -o sender sender.c -pthread
 
-gcc -o sender sender.c -pthread
+gcc -o receiver receiver.c -pthread
 
 ./receiver 5000
 
 ./sender addr port msg
 
 ifconfig
+
+gcc -o teste teste.c
+
+
+// int get_checksum(char *msg){
+//     int checksum, sum=0, i;
+//     for(i=0;i<MAXLINE-4;i++){
+//         sum+=msg[i];
+//     }
+//     checksum=~sum;
+//     return checksum;
+// }
+
+// void sender_make_pkt(char *pkt, char *msg, int state){
+//     union CkSum checksum;
+//     char aux[MAXLINE];
+
+
+//     strcat(aux, (char) state);          // Add state
+//     strcat(aux, 0);                     // Add ACK
+//     strcat(aux, msg);                   // Add msg
+
+//     checksum.dword = get_checksum(msg);
+
+//     sprintf(pkt, "%c%c%c%c",
+//             checksum.byte0,
+//             checksum.byte1,
+//             checksum.byte2,
+//             checksum.byte3
+//             ); 
+
+//     strcat(pkt, aux);             // Add checksum
+
+// }
