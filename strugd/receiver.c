@@ -11,65 +11,32 @@
 #define FILA 1000
 #define MAXLINE 1000
 
+typedef struct TPacote{
+    int checksum;
+    char ack;
+    char msg[MAXLINE];
+    char state;
+} Pacote;
+
 struct tparam_t {
 	int cfd, nr;
 	pthread_t tid;
 	struct sockaddr_in caddr;
 	socklen_t addr_len;
-	char req[MAXLINE];
+	Pacote req;
 };
 
-int get_checksum(char *msg){
-    int checksum, sum=0, i;
-    for(i=4;i<MAXLINE-4;i++){
-		if(msg[i] == 0) break;
-        sum+=msg[i];
-    }
-    checksum=~sum;
-    return checksum;
-}
-union CkSum
-{
-    int dword;
-
-    struct
-    {
-        uint8_t byte0;
-        uint8_t byte1;
-        uint8_t byte2;
-        uint8_t byte3;
-    };
-};
-
-void printpacket(char *msg){
-    for(int i=0;i<50;i++){
-        // printf("%c // %d    ",msg[i],msg[i]);
-        // printf("%c ",msg[i]);
-        printf("%d ",msg[i]);
-    }
-}
 void *trata_cliente(void *args){
 	struct tparam_t t = *(struct tparam_t*)args;
 	printf("Cliente IP(%s):Porta(%d): %d bytes: %s \n",
 		inet_ntoa(t.caddr.sin_addr),
 		ntohs(t.caddr.sin_port),
 		t.nr,
-		t.req);
-	printpacket(t.req);
-	union CkSum checksum;
-	checksum.dword = get_checksum(t.req);
-	printf("Soma: %d ",checksum.dword);
-
-	printf("\n\n%d %d %d %d",
-			checksum.byte0,
-			checksum.byte1,
-			checksum.byte2,
-			checksum.byte3
-			);
-
+		t.req.msg);
 	fflush(stdout);
 	// processa
-	sendto(t.cfd, t.req, t.nr, 0, (struct sockaddr*)&t.caddr, sizeof(struct sockaddr_in));
+	t.req.ack = '1';
+	sendto(t.cfd,t.req, t.nr, 0, (struct sockaddr*)&t.caddr, sizeof(struct sockaddr_in));
 	pthread_exit(NULL);
 }
 
@@ -117,7 +84,7 @@ int main(int argc, char **argv) {
 		t[i].cfd = ls;
 
 		// rdt_rcv
-		t[i].nr = recvfrom(t[i].cfd, t[i].req, MAXLINE, 0,
+		t[i].nr = recvfrom(t[i].cfd,(void*)t[i].req, sizeof(Pacote), 0,
 					(struct sockaddr *)&t[i].caddr, &t[i].addr_len);
 
 		// if corrupt(t[i].req) || has_wrong_seq(t[i].req, state[i])

@@ -19,69 +19,38 @@
 */
 
 //////////////// EM PROGRESSO //////////////////// 
-union CkSum
-{
-    int dword;
 
-    struct
-    {
-        uint8_t byte0;
-        uint8_t byte1;
-        uint8_t byte2;
-        uint8_t byte3;
-    };
-};
-void printpacket(char *msg){
-    for(int i=0;i<50;i++){
-        // printf("%c // %d    ",msg[i],msg[i]);
-        // printf("%c ",msg[i]);
-        printf("%d ",msg[i]);
-    }
-}
-int get_checksum(char *msg){
-    int checksum, sum=0, i;
-    for(i=0;i<MAXLINE-4;i++){
-		if(msg[i] == 0) break;
-        sum+=msg[i];
-    }
-    checksum=~sum;
-    return checksum;
-}
+typedef struct TPacote{
+    int checksum;
+    char ack;
+    char msg[MAXLINE];
+    char state;
+} Pacote;
 
-void sender_make_pkt(char *pkt, char *msg, int state){
-    union CkSum checksum;
-    char aux[MAXLINE] = {0};
-    memset(aux,0,sizeof(aux));
+// char get_checksum(char *msg){
+//     int checksum, sum=0, i;
+//     for(i=0;i<MAXLINE-6;i++){
+//         sum+=msg[i];
+//     }
+//     checksum=~sum;
+//     return checksum;
+// }
 
+// void sender_make_pkt(char *pkt, char *msg, int state){
+//     char checksum;
+//     checksum = get_checksum(msg);
 
-    sprintf(aux,"%d%d",state,0);           // Add state and ack
-    strcat(aux, msg);                               // Add msg
+//     strcat(pkt, &checksum);             // Add checksum
+//     strcat(pkt, (char) state);          // Add state
+//     strcat(pkt, '0');                     // Add ACK
+//     strcat(pkt, msg);                   // Add msg
+// }
 
-    checksum.dword = get_checksum(aux);
-    printf("Soma: %d ",checksum.dword);
-    printf("\n%d %d %d %d\n",
-            checksum.byte0,
-            checksum.byte1,
-            checksum.byte2,
-            checksum.byte3
-            ); 
-    sprintf(pkt, "%c%c%c%c%d%d%s",
-            checksum.byte0,
-            checksum.byte1,
-            checksum.byte2,
-            checksum.byte3,
-            state,0,msg
-            ); 
-    printpacket(pkt);
-    printf("\n\n");
-
-}
 
 /////////////////////////////////////////////////
 
 int main(int argc, char **argv) { 
     int sockfd; 
-    char rcvpkt[MAXLINE];  
     struct sockaddr_in servaddr; 
     struct timeval tout;
     
@@ -108,22 +77,29 @@ int main(int argc, char **argv) {
     servaddr.sin_addr.s_addr = inet_addr(argv[1]);
         
     int n, len, state = 0;
-    char sndpkt[MAXLINE] = {1};
-    char msg[MAXLINE] = {0};
-    // while(1){
-        sprintf(msg, "Samba enredo"); // Adicionar o valor state e checksum
-        sender_make_pkt(sndpkt,msg,state);
-        printpacket(sndpkt);
+    Pacote *pkg = (Pacote*) malloc(sizeof(Pacote));
+    Pacote *rcvpkt = (Pacote*) malloc(sizeof(Pacote));
+
+    while(1){
+        // make_pkt(state, data, checksum)
+        char *sndpkt;
+        sprintf(sndpkt, "%d", state); // Adicionar o valor state e checksum
+        pkg->ack = '0';
+        pkg->checksum = 532;
+        strcpy(pkg->msg,"AAAA");
+        pkg->state = (char)state;
+
+        
         do{
             // rdt_send()
-            sendto(sockfd, (const char *)sndpkt, strlen(sndpkt), 
+            sendto(sockfd, pkg, sizeof(Pacote), 
                 MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
                     sizeof(servaddr)); 
-            printf("\n%s sent.\n",msg); 
+            printf("Hello message sent.\n"); 
             //
         
             // rdt_rcv()
-            n = recvfrom(sockfd, (char *)rcvpkt, MAXLINE,  
+            n = recvfrom(sockfd, rcvpkt, sizeof(Pacote),  
                     MSG_WAITALL, (struct sockaddr *) &servaddr, 
                     &len); 
             //
@@ -131,7 +107,7 @@ int main(int argc, char **argv) {
         } while(n == -1); // rdt_rcv(rcvpkt) && (corrupt(rcvplt) || isACK(rcvpkt, (state+1)%2))
         
         state = (state+1)%2;
-    // }
+    }
     
     close(sockfd); 
     return 0; 
