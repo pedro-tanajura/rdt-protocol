@@ -31,8 +31,9 @@ union CkSum
         uint8_t byte3;
     };
 };
+
 void printpacket(char *msg){
-	printf("%ld\n",strlen(msg));
+	printf("tamanho da msg: %ld\n",strlen(msg));
     for(int i=0;i<sizeof(msg);i++){
 		if(msg[i] == 0) break;
         // printf("%c // %d    ",msg[i],msg[i]);
@@ -41,9 +42,12 @@ void printpacket(char *msg){
     }
 	printf("\n");
 }
-int get_checksum(char *msg){
+
+int get_checksum(char *msg, int start){
     int checksum, sum=0, i;
-    for(i=0;i<sizeof(msg);i++){
+    //printf("msg %s\n",msg);
+    //printf("strlen %d\n",strlen(msg));
+    for(i=start;i<strlen(msg);i++){
 		if(msg[i] == 0) break;
         sum+=msg[i];
     }
@@ -52,15 +56,19 @@ int get_checksum(char *msg){
 }
 
 void sender_make_pkt(char *pkt, char *msg, int state){
+    printf("entrei no sender mk pkt\n");
+
     union CkSum checksum;
-    char aux[MAXLINE] = {0};
+    char aux[MAXLINE+1] = {0};
     memset(aux,0,sizeof(aux));
 
+    aux[0] = state + 48;
 
-    sprintf(aux,"%d",state);           // Add state 
-    strcat(aux, msg);                               // Add msg
+    printf("aux entre strcat: %s\n", aux);
+    strcat(aux, msg);                  // Add msg
+    printf("aux: %s\n", aux);
 
-    checksum.dword = get_checksum(aux);
+    checksum.dword = get_checksum(aux, 0);
     printf("Soma: %d ",checksum.dword);
     printf("\n%d %d %d %d\n",
             checksum.byte0,
@@ -77,14 +85,49 @@ void sender_make_pkt(char *pkt, char *msg, int state){
             ); 
     printpacket(pkt);
     printf("\n\n");
+}
 
+int isWrongState(char *req, int state){
+    printf("states: req %d - state %d\n", req[STATE], state + 48);
+	if(req[STATE] == state + 48) return 0;
+	return 1;
+}
+
+int isCorrupt(char *req){
+	union CkSum checksum;
+	int i;
+    
+	checksum.dword = get_checksum(req, 4);
+    /*
+    printf("estou na funcao corrupto\n req:\n");
+    printpacket(req);
+    printf("checksum esperado:\n");
+    printf("\n%d %d %d %d\n",
+        checksum.byte0,
+        checksum.byte1,
+        checksum.byte2,
+        checksum.byte3
+        ); 
+    printf("\nchar byte0 %c char req0 %c \n int byte0 %d int req0 %d\n",
+        checksum.byte0,
+        req[0],
+        checksum.byte0,
+        req[0]
+        ); 
+    */
+	if((char) checksum.byte0 != (char) req[0]) return 1;
+	if((char) checksum.byte1 != (char) req[1]) return 1;
+	if((char) checksum.byte2 != (char) req[2]) return 1;
+	if((char) checksum.byte3 != (char) req[3]) return 1;
+
+	return 0;
 }
 
 /////////////////////////////////////////////////
 
 int main(int argc, char **argv) { 
     int sockfd; 
-    char rcvpkt[MAXLINE];  
+    char rcvpkt[5];  
     struct sockaddr_in servaddr; 
     struct timeval tout;
     
@@ -113,8 +156,9 @@ int main(int argc, char **argv) {
     int n, len, state = 0;
     char sndpkt[MAXLINE] = {1};
     char msg[MAXLINE] = {0};
-    // while(1){
-        sprintf(msg, "Samba enredo"); // Adicionar o valor state e checksum
+
+    while(1){
+        sprintf(msg, argv[3]); // Adicionar o valor state e checksum
         sender_make_pkt(sndpkt,msg,state);
         do{
             // rdt_send()
@@ -125,15 +169,23 @@ int main(int argc, char **argv) {
             //
         
             // rdt_rcv()
-            n = recvfrom(sockfd, (char *)rcvpkt, MAXLINE,  
+            n = recvfrom(sockfd, rcvpkt, 6,  
                     MSG_WAITALL, (struct sockaddr *) &servaddr, 
                     &len); 
+            if(n != -1){
+                printf("recebi: %d\n", rcvpkt[4]);
+            }
             //
-        // while(n == -1 || (corrupt(rcvpkt) || isACK(rcvpkt, (state+1)%2))
-        } while(n == -1); // rdt_rcv(rcvpkt) && (corrupt(rcvplt) || isACK(rcvpkt, (state+1)%2))
-        
+            sleep(3);
+            if(n == -1) printf("estou -1\n");
+            if(isCorrupt(rcvpkt)) printf("estou corrupto\n");
+            if(isWrongState(rcvpkt, state)) printf("estou wrongstate\n");
+
+        } while(n == -1 || isCorrupt(rcvpkt) || isWrongState(rcvpkt, state));
+        printf("\n\n\n\ntroquei state\n\n\n\n");
         state = (state+1)%2;
-    // }
+        sleep(3);
+    }
     
     close(sockfd); 
     return 0; 
