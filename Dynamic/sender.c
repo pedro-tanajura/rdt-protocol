@@ -144,9 +144,9 @@ int main(int argc, char **argv) {
         perror("socket creation failed"); 
         exit(EXIT_FAILURE); 
     } 
-    tout.tv_sec=0;
-    tout.tv_usec=2000000;
-    EstRTT = 2;
+    tout.tv_sec=4;
+    tout.tv_usec=0;
+    EstRTT = 4;
     DevRTT = 0.05;
     if( setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tout, sizeof(struct timeval)) != 0){
         perror("setsockopt failed"); 
@@ -166,10 +166,10 @@ int main(int argc, char **argv) {
     int n, len, state = 0;
     char sndpkt[MAXLINE] = {1};
     char msg[MAXLINE] = {0};
-    gettimeofday(&start, NULL);
     while(1){
         sprintf(msg, argv[3]); // Adicionar o valor state e checksum
         sender_make_pkt(sndpkt,msg,state);
+        gettimeofday(&start, NULL);
         do{
             // rdt_send()
             sendto(sockfd, (const char *)sndpkt, strlen(sndpkt), 
@@ -190,28 +190,31 @@ int main(int argc, char **argv) {
             // sleep(3);
             if(n == -1){
                 printf("Timeout\n");
-
             }
             else{                
-                gettimeofday(&end, NULL);
-                float totalTime = convertTime(start, end);
-                EstRTT = EstRTT*0.8 + totalTime*0.2;
-                DevRTT = 0.75*DevRTT +(0.25*(totalTime-EstRTT)) ;
-                tout.tv_usec = 1000000*(EstRTT + 4*DevRTT);
-                gettimeofday(&start, NULL);
-                printf("\nTempo de TimeOut Recalculado: %ld\n",tout.tv_usec);
-                if( setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tout, sizeof(struct timeval)) != 0){
-                    perror("setsockopt failed"); 
-                    exit(EXIT_FAILURE); 
-                }
                 if(isCorrupt(rcvpkt)) printf("Pacote corrompido\n");
             }
 
         } while(n == -1 || isCorrupt(rcvpkt) || isWrongState(rcvpkt, state));
-
+        gettimeofday(&end, NULL);
+        float totalTime = convertTime(start, end);
+        EstRTT = EstRTT*0.8 + totalTime*0.2;
+        DevRTT = 0.75*DevRTT +(0.25*abs(totalTime-EstRTT)) ;
+        float timeoutAux = (EstRTT + 4*DevRTT);
+        if(timeoutAux > 0.5){
+            tout.tv_usec = ((int)(1000000*timeoutAux))%1000000;
+            tout.tv_sec = (int)timeoutAux;
+        }else{
+            tout.tv_usec = 500000;
+            tout.tv_sec = 0;
+        }
+        printf("\nTempo de demora do pacote: %f\nTempo de TimeOut Recalculado: %ld.%06ld\n",totalTime,tout.tv_sec,tout.tv_usec);
+        if( setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tout, sizeof(struct timeval)) != 0){
+            perror("setsockopt failed"); 
+            exit(EXIT_FAILURE); 
+        }
         printf("\nEstado trocado\n");
         state = (state+1)%2;
-        sleep(3);
     }
     
     close(sockfd); 
