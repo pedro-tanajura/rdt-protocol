@@ -7,7 +7,8 @@
 #include <sys/socket.h> 
 #include <arpa/inet.h> 
 #include <netinet/in.h> 
-    
+#include <sys/time.h>
+
 #define PORT    5000 
 #define MAXLINE 1000
 #define STATE 4
@@ -56,7 +57,7 @@ int get_checksum(char *msg, int start){
 }
 
 void sender_make_pkt(char *pkt, char *msg, int state){
-    printf("entrei no sender mk pkt\n");
+    // printf("entrei no sender mk pkt\n");
 
     union CkSum checksum;
     char aux[MAXLINE+1] = {0};
@@ -64,18 +65,18 @@ void sender_make_pkt(char *pkt, char *msg, int state){
 
     aux[0] = state + 48;
 
-    printf("aux entre strcat: %s\n", aux);
+    // printf("aux entre strcat: %s\n", aux);
     strcat(aux, msg);                  // Add msg
-    printf("aux: %s\n", aux);
+    // printf("aux: %s\n", aux);
 
     checksum.dword = get_checksum(aux, 0);
-    printf("Soma: %d ",checksum.dword);
-    printf("\n%d %d %d %d\n",
-            checksum.byte0,
-            checksum.byte1,
-            checksum.byte2,
-            checksum.byte3
-            ); 
+    // printf("Soma: %d ",checksum.dword);
+    // printf("\n%d %d %d %d\n",
+    //         checksum.byte0,
+    //         checksum.byte1,
+    //         checksum.byte2,
+    //         checksum.byte3
+    //         ); 
     sprintf(pkt, "%c%c%c%c%d%s",
             checksum.byte0,
             checksum.byte1,
@@ -83,13 +84,14 @@ void sender_make_pkt(char *pkt, char *msg, int state){
             checksum.byte3,
             state,msg
             ); 
-    printpacket(pkt);
-    printf("\n\n");
+    // printpacket(pkt);
+    // printf("\n\n");
 }
 
 int isWrongState(char *req, int state){
-    printf("states: req %d - state %d\n", req[STATE], state + 48);
+    printf("Estado recebido: %c - Estado esperado: %c\n", req[STATE], state + 48);
 	if(req[STATE] == state + 48) return 0;
+    printf("Pacote no estado errado\n");
 	return 1;
 }
 
@@ -124,20 +126,28 @@ int isCorrupt(char *req){
 }
 
 /////////////////////////////////////////////////
+float convertTime(struct timeval start, struct timeval end)
+{
+    return (end.tv_sec - start.tv_sec) + 1e-6*(end.tv_usec - start.tv_usec);
+}
 
 int main(int argc, char **argv) { 
     int sockfd; 
     char rcvpkt[5];  
     struct sockaddr_in servaddr; 
     struct timeval tout;
-    
+    double EstRTT, DevRTT;
+    struct timeval start, end;
+
     // Creating socket file descriptor 
     if ( (sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0 ) { 
         perror("socket creation failed"); 
         exit(EXIT_FAILURE); 
     } 
-    tout.tv_sec=3;
-    tout.tv_usec=0;
+    tout.tv_sec=0;
+    tout.tv_usec=2000000;
+    EstRTT = 2;
+    DevRTT = 0.05;
     if( setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tout, sizeof(struct timeval)) != 0){
         perror("setsockopt failed"); 
         exit(EXIT_FAILURE); 
@@ -156,7 +166,7 @@ int main(int argc, char **argv) {
     int n, len, state = 0;
     char sndpkt[MAXLINE] = {1};
     char msg[MAXLINE] = {0};
-
+    gettimeofday(&start, NULL);
     while(1){
         sprintf(msg, argv[3]); // Adicionar o valor state e checksum
         sender_make_pkt(sndpkt,msg,state);
@@ -164,8 +174,9 @@ int main(int argc, char **argv) {
             // rdt_send()
             sendto(sockfd, (const char *)sndpkt, strlen(sndpkt), 
                 MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
-                    sizeof(servaddr)); 
-            printf("\n%s sent.\n",msg); 
+                    sizeof(servaddr));
+            printf("\nMensagem \"%s\" enviada.\n",msg);
+            
             //
         
             // rdt_rcv()
@@ -173,16 +184,32 @@ int main(int argc, char **argv) {
                     MSG_WAITALL, (struct sockaddr *) &servaddr, 
                     &len); 
             if(n != -1){
-                printf("recebi: %d\n", rcvpkt[4]);
+                printf("Estado recebido: %c\n", rcvpkt[4]);
             }
             //
-            sleep(3);
-            if(n == -1) printf("estou -1\n");
-            if(isCorrupt(rcvpkt)) printf("estou corrupto\n");
-            if(isWrongState(rcvpkt, state)) printf("estou wrongstate\n");
+            // sleep(3);
+            if(n == -1){
+                printf("Timeout\n");
+
+            }
+            else{                
+                gettimeofday(&end, NULL);
+                float totalTime = convertTime(start, end);
+                EstRTT = EstRTT*0.8 + totalTime*0.2;
+                DevRTT = 0.75*DevRTT +(0.25*(totalTime-EstRTT)) ;
+                tout.tv_usec = 1000000*(EstRTT + 4*DevRTT);
+                gettimeofday(&start, NULL);
+                printf("\nTempo de TimeOut Recalculado: %ld\n",tout.tv_usec);
+                if( setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tout, sizeof(struct timeval)) != 0){
+                    perror("setsockopt failed"); 
+                    exit(EXIT_FAILURE); 
+                }
+                if(isCorrupt(rcvpkt)) printf("Pacote corrompido\n");
+            }
 
         } while(n == -1 || isCorrupt(rcvpkt) || isWrongState(rcvpkt, state));
-        printf("\n\n\n\ntroquei state\n\n\n\n");
+
+        printf("\nEstado trocado\n");
         state = (state+1)%2;
         sleep(3);
     }

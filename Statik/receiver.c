@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <string.h>
+#include <sys/time.h>
 
 #define FILA 1
 #define MAXLINE 1000
@@ -75,21 +76,21 @@ int isCorrupt(char *req){
 
 	checksum.dword = get_checksum(req);
 
-    printf("estou na funcao corrupto\n req:\n");
-    printpacket(req);
-    printf("checksum esperado:\n");
-    printf("\n%d %d %d %d\n",
-        checksum.byte0,
-        checksum.byte1,
-        checksum.byte2,
-        checksum.byte3
-    ); 
-    printf("\nchar byte0 %c char req0 %c \n int byte0 %d int req0 %d\n",
-        checksum.byte0,
-        req[0],
-        checksum.byte0,
-        req[0]
-    ); 
+    // printf("estou na funcao corrupto\n req:\n");
+    // printpacket(req);
+    // printf("checksum esperado:\n");
+    // printf("\n%d %d %d %d\n",
+    //     checksum.byte0,
+    //     checksum.byte1,
+    //     checksum.byte2,
+    //     checksum.byte3
+    // ); 
+    // printf("\nchar byte0 %c char req0 %c \n int byte0 %d int req0 %d\n",
+    //     checksum.byte0,
+    //     req[0],
+    //     checksum.byte0,
+    //     req[0]
+    // ); 
 
 	if((char) checksum.byte0 != (char) req[0]) return 1;
 	if((char) checksum.byte1 != (char) req[1]) return 1;
@@ -167,8 +168,8 @@ int main(int argc, char **argv) {
 		t[i].req[t[i].nr] = 0;
 
 		if(t[i].nr != -1){
-            if(isCorrupt(t[i].req)) printf("estou corrupto\n");
-            if(isWrongState(t[i])) printf("estou wrongstate\n");
+            if(isCorrupt(t[i].req)) printf("Pacote corrompido\n");
+            if(isWrongState(t[i])) printf("Pacote no estado errado\n");
 			if((isCorrupt(t[i].req) || (isWrongState(t[i]))) && t[i].oncethru == 1){
 				printf("entrei no is corrupt is wrongstate.\n");
 				sendto(t[i].cfd, pktAck[(t[i].state+1)%2], 6, 0, (struct sockaddr*)&t[i].caddr, sizeof(struct sockaddr_in));
