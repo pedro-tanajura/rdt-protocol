@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
 	int i=0;
 
 	while (1) {
-		printf("socket id = %d\n", i);
+		printf("socket id: %d Estado: %d\n", i , t[i].state);
 
 		t[i].addr_len = sizeof(struct sockaddr_in);
 		bzero(&t[i].caddr, t[i].addr_len);

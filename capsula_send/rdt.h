@@ -11,6 +11,7 @@
 
 #define STATE 4
 #define MAXLINE 1000
+#define tempoDinamico 0
 
 /* Header do sndpkt
     1,2,3,4 bytes: checksum
@@ -43,8 +44,8 @@ union CkSum
 
 void printpacket(char *msg){
 	printf("tamanho da msg: %ld\n",strlen(msg));
-    for(int i=0;i<15/*sizeof(msg)*/;i++){
-		// if(msg[i] == 0) break;
+    for(int i=0;i<MAXLINE/*sizeof(msg)*/;i++){
+		if(msg[i] == 0) break;
         //printf("%c // %d    ",msg[i],msg[i]);
         //printf("%c ",msg[i]);
         printf("%d ",msg[i]);
@@ -92,12 +93,12 @@ int isCorrupt(char *req, int start){
 
 	checksum.dword = get_checksum(req, start);
 
-    printf("\n%d %d %d %d\n",
-            checksum.byte0,
-            checksum.byte1,
-            checksum.byte2,
-            checksum.byte3
-            ); 
+    // printf("\n%d %d %d %d\n",        /// print dos bytes para o checksum
+    //         checksum.byte0,
+    //         checksum.byte1,
+    //         checksum.byte2,
+    //         checksum.byte3
+    //         ); 
 
 	if((char) checksum.byte0 != (char) req[0]) return 1;
 	if((char) checksum.byte1 != (char) req[1]) return 1;
@@ -123,12 +124,11 @@ void rdt_rcv(void *tparam_args){
     struct tparam_t *t = (struct tparam_t*)tparam_args;
     t->nr = recvfrom(t->cfd, t->req, MAXLINE, 0,
             (struct sockaddr *)&t->caddr, &t->addr_len);
-
-    printpacket(t->req);
-
+    // printpacket(t->req);
     if(t->nr != -1){
-        t->req[t->nr] = 0; // ultimo byte recebe /0
-
+        t->req[t->nr] = 0; // ultimo byte recebe /0]
+        printf("Estado da Mensagem: %c\n",t->req[4]);
+        printf("Mensagem recebida: %s\n\n",&t->req[5]);
         if(isCorrupt(t->req, 4)) printf("Pacote corrompido\n");
         if(isWrongState(t->req, t->state)) printf("Pacote no estado errado\n");
         if((isCorrupt(t->req, 4) || (isWrongState(t->req, t->state))) && t->oncethru == 1){
@@ -174,7 +174,7 @@ void rdt_snd(int sockfd, char *msg, int state, char *port, char *ip){
             MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
                 sizeof(servaddr));
         printf("\nMensagem \"%s\" enviada.\n",msg);
-        printpacket(sndpkt);
+        // printpacket(sndpkt);
 
         n = recvfrom(sockfd, rcvpkt, 6,  
                 MSG_WAITALL, (struct sockaddr *) &servaddr, 
@@ -189,26 +189,27 @@ void rdt_snd(int sockfd, char *msg, int state, char *port, char *ip){
         else{                
             if(isCorrupt(rcvpkt, 0)) printf("Ack corrompido\n");
         }
-        printpacket(rcvpkt);
+        // printpacket(rcvpkt);
 
     } while(n == -1 || isCorrupt(rcvpkt, 4) || isWrongState(rcvpkt, state));
     gettimeofday(&end, NULL);
-
-    // Ajuste do tempo de timeout
-    float totalTime = convertTime(start, end);
-    EstRTT = EstRTT*0.8 + totalTime*0.2;
-    DevRTT = 0.75*DevRTT +(0.25*abs(totalTime-EstRTT)) ;
-    float timeoutAux = (EstRTT + 4*DevRTT);
-    if(timeoutAux > 0.5){
-        tout.tv_usec = ((int)(1000000*timeoutAux))%1000000;
-        tout.tv_sec = (int)timeoutAux;
-    }else{
-        tout.tv_usec = 500000;
-        tout.tv_sec = 0;
-    }
-    printf("\nTempo de demora do pacote: %f\nTempo de TimeOut Recalculado: %ld.%06ld\n",totalTime,tout.tv_sec,tout.tv_usec);
-    if( setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tout, sizeof(struct timeval)) != 0){
-        perror("setsockopt failed"); 
-        exit(EXIT_FAILURE); 
+    if(tempoDinamico == 1){
+        // Ajuste do tempo de timeout
+        float totalTime = convertTime(start, end);
+        EstRTT = EstRTT*0.8 + totalTime*0.2;
+        DevRTT = 0.75*DevRTT +(0.25*abs(totalTime-EstRTT)) ;
+        float timeoutAux = (EstRTT + 4*DevRTT);
+        if(timeoutAux > 0.5){
+            tout.tv_usec = ((int)(1000000*timeoutAux))%1000000;
+            tout.tv_sec = (int)timeoutAux;
+        }else{
+            tout.tv_usec = 500000;
+            tout.tv_sec = 0;
+        }
+        printf("\nTempo de demora do pacote: %f\nTempo de TimeOut Recalculado: %ld.%06ld\n",totalTime,tout.tv_sec,tout.tv_usec);
+        if( setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tout, sizeof(struct timeval)) != 0){
+            perror("setsockopt failed"); 
+            exit(EXIT_FAILURE); 
+        }
     }
 }
