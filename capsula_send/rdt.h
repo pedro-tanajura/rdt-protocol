@@ -187,7 +187,7 @@ void rdt_snd(int sockfd, char *msg, int state, char *port, char *ip){
             printf("Timeout\n");
         }
         else{                
-            if(isCorrupt(rcvpkt, 0)) printf("Ack corrompido\n");
+            if(isCorrupt(rcvpkt, 4)) printf("Ack corrompido\n");
         }
         // printpacket(rcvpkt);
 
