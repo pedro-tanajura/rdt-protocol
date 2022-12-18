@@ -11,7 +11,7 @@
 
 #define STATE 4
 #define MAXLINE 1000
-#define tempoDinamico 0
+#define tempoDinamico 1
 
 /* Header do sndpkt
     1,2,3,4 bytes: checksum
@@ -27,6 +27,10 @@ struct tparam_t {
 	char req[MAXLINE];
 	char state;
 	char oncethru;
+};
+
+struct timeConfig {
+    double EstRTT, DevRTT;
 };
 
 union CkSum
@@ -140,19 +144,17 @@ void rdt_rcv(void *tparam_args){
             t->state = (t->state+1)%2;
         }
     }
-    sleep(3);
 }
 
-void rdt_snd(int sockfd, char *msg, int state, char *port, char *ip){
+void rdt_snd(int sockfd, char *msg, int state, char *port, char *ip,void *TConf){
     struct timeval tout;
-    double EstRTT, DevRTT;
     struct timeval start, end;
+    struct timeConfig *tConf = (struct timeConfig*)TConf;
     int n, len = 0;
     char sndpkt[MAXLINE] = {1};
-    tout.tv_sec=4;
-    tout.tv_usec=0;
-    EstRTT = 4;
-    DevRTT = 0.05;
+    double timeoutAux = (tConf->EstRTT + 4*tConf->DevRTT);
+    tout.tv_usec = ((int)(1000000*timeoutAux))%1000000;
+    tout.tv_sec = (int)timeoutAux;
     char rcvpkt[5]; 
     struct sockaddr_in servaddr;
 
@@ -195,18 +197,14 @@ void rdt_snd(int sockfd, char *msg, int state, char *port, char *ip){
     gettimeofday(&end, NULL);
     if(tempoDinamico == 1){
         // Ajuste do tempo de timeout
-        float totalTime = convertTime(start, end);
-        EstRTT = EstRTT*0.8 + totalTime*0.2;
-        DevRTT = 0.75*DevRTT +(0.25*abs(totalTime-EstRTT)) ;
-        float timeoutAux = (EstRTT + 4*DevRTT);
-        if(timeoutAux > 0.5){
-            tout.tv_usec = ((int)(1000000*timeoutAux))%1000000;
-            tout.tv_sec = (int)timeoutAux;
-        }else{
-            tout.tv_usec = 500000;
-            tout.tv_sec = 0;
-        }
-        printf("\nTempo de demora do pacote: %f\nTempo de TimeOut Recalculado: %ld.%06ld\n",totalTime,tout.tv_sec,tout.tv_usec);
+        printf("EST: %lf\n",tConf->EstRTT);
+        double totalTime = convertTime(start, end);
+        printf("TT: %f\n",totalTime);
+        tConf->EstRTT = tConf->EstRTT*0.8 + totalTime*0.2;
+        tConf->DevRTT = 0.75*tConf->DevRTT +(0.25*abs(totalTime-tConf->EstRTT)) ;
+        timeoutAux = (tConf->EstRTT + 4*tConf->DevRTT);
+        printf("EST: %lf\n",tConf->EstRTT);
+        printf("\nTempo de demora do pacote: %f\nTempo de TimeOut Recalculado: %lf\n",totalTime,timeoutAux);
         if( setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tout, sizeof(struct timeval)) != 0){
             perror("setsockopt failed"); 
             exit(EXIT_FAILURE); 

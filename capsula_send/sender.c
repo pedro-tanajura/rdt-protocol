@@ -14,7 +14,9 @@
 
 int main(int argc, char **argv) { 
     int sockfd;  
-
+    struct timeConfig TConf;
+    TConf.DevRTT = 0.05;
+    TConf.EstRTT = 4;
     // Creating socket file descriptor 
     if ( (sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0 ) { 
         perror("socket creation failed"); 
@@ -30,7 +32,7 @@ int main(int argc, char **argv) {
 
     sprintf(msg, argv[3]);
     while(1){
-        rdt_snd(sockfd, msg, state, argv[2], argv[1]);
+        rdt_snd(sockfd, msg, state, argv[2], argv[1],(void *)&TConf);
         printf("\nEstado trocado\n");
         state = (state+1)%2;
     }
