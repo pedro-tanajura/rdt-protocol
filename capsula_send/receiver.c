@@ -29,6 +29,8 @@ int main(int argc, char **argv) {
 	for(int i=0; i<FILA; i++){
 		struct sockaddr_in addr;
 		addr.sin_addr.s_addr = INADDR_ANY;
+		
+		memset(t[i].req,0,MAXLINE);
 
 		printf("porta: %d\n", atoi(argv[1]) + i);
 

@@ -92,6 +92,13 @@ int isCorrupt(char *req, int start){
 
 	checksum.dword = get_checksum(req, start);
 
+    printf("\n%d %d %d %d\n",
+            checksum.byte0,
+            checksum.byte1,
+            checksum.byte2,
+            checksum.byte3
+            ); 
+
 	if((char) checksum.byte0 != (char) req[0]) return 1;
 	if((char) checksum.byte1 != (char) req[1]) return 1;
 	if((char) checksum.byte2 != (char) req[2]) return 1;
@@ -160,10 +167,9 @@ void rdt_snd(int sockfd, char *msg, int state, char *port, char *ip){
         exit(EXIT_FAILURE); 
     }
 
-    sender_make_pkt(sndpkt, msg, state);
-
     gettimeofday(&start, NULL);
     do{
+        sender_make_pkt(sndpkt, msg, state);
         sendto(sockfd, (const char *)sndpkt, strlen(sndpkt), 
             MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
                 sizeof(servaddr));
@@ -172,21 +178,20 @@ void rdt_snd(int sockfd, char *msg, int state, char *port, char *ip){
 
         n = recvfrom(sockfd, rcvpkt, 6,  
                 MSG_WAITALL, (struct sockaddr *) &servaddr, 
-                &len); 
+                &len);
+        rcvpkt[5] = 0; 
         if(n != -1){
             printf("Estado recebido: %c\n", rcvpkt[4]);
         }
-        printpacket(sndpkt);
-
         if(n == -1){
             printf("Timeout\n");
         }
         else{                
-            if(isCorrupt(rcvpkt, 0)) printf("Pacote corrompido\n");
+            if(isCorrupt(rcvpkt, 0)) printf("Ack corrompido\n");
         }
-        printpacket(sndpkt);
+        printpacket(rcvpkt);
 
-    } while(n == -1 || isCorrupt(rcvpkt, 0) || isWrongState(rcvpkt, state));
+    } while(n == -1 || isCorrupt(rcvpkt, 4) || isWrongState(rcvpkt, state));
     gettimeofday(&end, NULL);
 
     // Ajuste do tempo de timeout
