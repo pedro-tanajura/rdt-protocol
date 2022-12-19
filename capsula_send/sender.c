@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
     int state = 0;
 
     sprintf(msg, argv[3]);
-    while(1){
+    for(int i=0;i<50;i++){
         rdt_snd(sockfd, msg, state, argv[2], argv[1],(void *)&TConf);
         printf("\nEstado trocado\n");
         state = (state+1)%2;

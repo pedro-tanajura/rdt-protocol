@@ -197,9 +197,7 @@ void rdt_snd(int sockfd, char *msg, int state, char *port, char *ip,void *TConf)
     gettimeofday(&end, NULL);
     if(tempoDinamico == 1){
         // Ajuste do tempo de timeout
-        printf("EST: %lf\n",tConf->EstRTT);
         double totalTime = convertTime(start, end);
-        printf("TT: %f\n",totalTime);
         tConf->EstRTT = tConf->EstRTT*0.8 + totalTime*0.2;
         tConf->DevRTT = 0.75*tConf->DevRTT +(0.25*abs(totalTime-tConf->EstRTT)) ;
         timeoutAux = (tConf->EstRTT + 4*tConf->DevRTT);
