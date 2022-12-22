@@ -12,8 +12,6 @@
 #include "rdt.h"
 
 #define FILA 1
-#define MAXLINE 1000
-#define STATE 4
 
 int main(int argc, char **argv) {
 	struct timeval tout;
@@ -31,6 +29,8 @@ int main(int argc, char **argv) {
 	for(int i=0; i<FILA; i++){
 		struct sockaddr_in addr;
 		addr.sin_addr.s_addr = INADDR_ANY;
+		
+		memset(t[i].req,0,MAXLINE);
 
 		printf("porta: %d\n", atoi(argv[1]) + i);
 
@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
 	int i=0;
 
 	while (1) {
-		printf("socket id = %d\n", i);
+		printf("socket id: %d Estado: %d\n", i , t[i].state);
 
 		t[i].addr_len = sizeof(struct sockaddr_in);
 		bzero(&t[i].caddr, t[i].addr_len);

@@ -11,7 +11,7 @@
 
 #define STATE 4
 #define MAXLINE 1000
-#define tempoDinamico 1
+#define tempoDinamico 0
 
 /* Header do sndpkt
     1,2,3,4 bytes: checksum
@@ -68,14 +68,17 @@ int get_checksum(char *msg, int start){
 }
 
 void sender_make_pkt(char *pkt, char *msg, int state){
+    int randomNumber = rand() % 2;
     union CkSum checksum;
     char aux[MAXLINE+1] = {0};
     memset(aux,0,sizeof(aux));
 
     aux[0] = state + 48;
 
-    strcat(aux, msg);              
-    checksum.dword = get_checksum(aux, 0);
+    strcat(aux, msg);  
+                
+    // se somar 0 não muda o checksum, se somar 1 envia o checksum com erro
+    checksum.dword = get_checksum(aux, 0) + randomNumber;
 
     sprintf(pkt, "%c%c%c%c%d%s",
             checksum.byte0,
@@ -133,10 +136,9 @@ void rdt_rcv(void *tparam_args){
         t->req[t->nr] = 0; // ultimo byte recebe /0]
         printf("Estado da Mensagem: %c\n",t->req[4]);
         printf("Mensagem recebida: %s\n\n",&t->req[5]);
-        if(isCorrupt(t->req, 4)) printf("Pacote corrompido\n");
+        if(isCorrupt(t->req, 4)) printf("Pacote corrompido\n\n");
         if(isWrongState(t->req, t->state)) printf("Pacote no estado errado\n");
         if((isCorrupt(t->req, 4) || (isWrongState(t->req, t->state))) && t->oncethru == 1){
-            printf("entrei no is corrupt is wrongstate.\n");
             sendto(t->cfd, pktAck[(t->state+1)%2], 6, 0, (struct sockaddr*)&t->caddr, sizeof(struct sockaddr_in));
         }else{
             sendto(t->cfd, pktAck[t->state], 6, 0, (struct sockaddr*)&t->caddr, sizeof(struct sockaddr_in));
@@ -157,6 +159,7 @@ void rdt_snd(int sockfd, char *msg, int state, char *port, char *ip,void *TConf)
     tout.tv_sec = (int)timeoutAux;
     char rcvpkt[5]; 
     struct sockaddr_in servaddr;
+    int TimeOutOuInicio = 1;
 
     memset(&servaddr, 0, sizeof(servaddr)); 
     // Filling server information 
@@ -172,10 +175,17 @@ void rdt_snd(int sockfd, char *msg, int state, char *port, char *ip,void *TConf)
     gettimeofday(&start, NULL);
     do{
         sender_make_pkt(sndpkt, msg, state);
-        sendto(sockfd, (const char *)sndpkt, strlen(sndpkt), 
-            MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
-                sizeof(servaddr));
-        printf("\nMensagem \"%s\" enviada.\n",msg);
+        if(TimeOutOuInicio == 1){
+            sendto( sockfd,
+                    (const char *)sndpkt, 
+                    strlen(sndpkt), 
+                    MSG_CONFIRM,
+                    (const struct sockaddr *) &servaddr,  
+                    sizeof(servaddr));
+            printf("\nMensagem \"%s\" enviada.\n",msg);
+        }
+        TimeOutOuInicio = 0;
+        
         // printpacket(sndpkt);
 
         n = recvfrom(sockfd, rcvpkt, 6,  
@@ -187,8 +197,10 @@ void rdt_snd(int sockfd, char *msg, int state, char *port, char *ip,void *TConf)
         }
         if(n == -1){
             printf("Timeout\n");
+            TimeOutOuInicio = 1;
         }
         else{                
+            if(isWrongState(rcvpkt, state))printf("Ack no estado errado\n");
             if(isCorrupt(rcvpkt, 4)) printf("Ack corrompido\n");
         }
         // printpacket(rcvpkt);

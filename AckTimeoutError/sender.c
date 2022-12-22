@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
     int sockfd;  
     struct timeConfig TConf;
     TConf.DevRTT = 0.05;
-    TConf.EstRTT = 4;
+    TConf.EstRTT = 0.2;
     // Creating socket file descriptor 
     if ( (sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0 ) { 
         perror("socket creation failed"); 
@@ -27,12 +27,15 @@ int main(int argc, char **argv) {
     printf("%s\n", argv[2]);
     printf("%s\n", argv[3]);
     
-    char msg[MAXLINE] = {0};
+    char msg[MAXLINE-20] = {0};
+    char msgaux[MAXLINE] = {0};
+
     int state = 0;
 
     sprintf(msg, argv[3]);
     for(int i=0;i<50;i++){
-        rdt_snd(sockfd, msg, state, argv[2], argv[1],(void *)&TConf);
+        sprintf(msgaux,"%s numero:%d",msg,i);
+        rdt_snd(sockfd, msgaux, state, argv[2], argv[1],(void *)&TConf);
         printf("\nEstado trocado\n");
         state = (state+1)%2;
     }
